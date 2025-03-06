@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .drop-zone {
+            border: 2px dashed #4F46E5;
+            transition: all 0.3s ease;
+        }
+        .drop-zone:hover {
+            border-color: #6366F1;
+            background-color: rgba(79, 70, 229, 0.1);
+        }
+        .loading {
+            display: none;
+        }
+        .loading.active {
+            display: flex;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        .chart-container.small {
+            height: 200px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">Chat Analyzer</h1>
+            <p class="text-gray-600">Upload an image to extract and analyze text</p>
+        </header>
+
+        <main class="max-w-3xl mx-auto">
+            <!-- Upload Section -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <div id="drop-zone" class="drop-zone rounded-lg p-8 text-center cursor-pointer">
+                    <div class="space-y-4">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <div class="text-gray-600">
+                            <label for="file-upload" class="relative cursor-pointer">
+                                <span class="text-indigo-600 hover:text-indigo-500">Upload a file</span>
+                                <span class="text-gray-500"> or drag and drop</span>
+                                <input id="file-upload" type="file" class="sr-only" accept="image/*">
+                            </label>
+                        </div>
+                        <p class="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="loading" class="loading items-center justify-center space-x-2 mb-8">
+                <div class="w-4 h-4 bg-indigo-600 rounded-full animate-bounce"></div>
+                <div class="w-4 h-4 bg-indigo-600 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                <div class="w-4 h-4 bg-indigo-600 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="results" class="space-y-6 hidden">
+                <!-- Image Preview -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4">Uploaded Image</h2>
+                    <img id="image-preview" class="max-w-full h-auto rounded-lg" src="" alt="Uploaded image">
+                </div>
+
+                <!-- Extracted Text -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4">Extracted Text</h2>
+                    <div id="extracted-text" class="prose max-w-none text-gray-700"></div>
+                    <div class="mt-4 text-sm text-gray-500">
+                        Words: <span id="word-count">0</span> | Characters: <span id="char-count">0</span>
+                    </div>
+                </div>
+
+                <!-- Visualizations Section -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4">Analysis Visualizations</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="font-medium text-gray-900 mb-2">Sentiment Analysis</h3>
+                            <div class="chart-container">
+                                <canvas id="sentimentChart"></canvas>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="font-medium text-gray-900 mb-2">Topic Distribution</h3>
+                            <div class="chart-container">
+                                <canvas id="topicsChart"></canvas>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="font-medium text-gray-900 mb-2">Word Frequency</h3>
+                            <div class="chart-container">
+                                <canvas id="wordFrequencyChart"></canvas>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="font-medium text-gray-900 mb-2">Sentiment Metrics</h3>
+                            <div class="chart-container">
+                                <canvas id="sentimentMetricsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analysis Results -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4">Analysis</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <h3 class="font-medium text-gray-900">Summary</h3>
+                            <p id="summary" class="mt-1 text-gray-700"></p>
+                        </div>
+                        <div>
+                            <h3 class="font-medium text-gray-900">Key Points</h3>
+                            <ul id="key-points" class="mt-1 list-disc list-inside text-gray-700"></ul>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <h3 class="font-medium text-gray-900">Sentiment</h3>
+                                <p id="sentiment" class="mt-1 text-gray-700"></p>
+                            </div>
+                            <div>
+                                <h3 class="font-medium text-gray-900">Language</h3>
+                                <p id="language" class="mt-1 text-gray-700"></p>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="font-medium text-gray-900">Topics</h3>
+                            <div id="topics" class="mt-1 flex flex-wrap gap-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Chat Interface after Analysis Results section -->
+            <div id="chat-interface" class="bg-white rounded-lg shadow-md p-6 mt-6 hidden">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Ask Questions About the Analysis</h2>
+                
+                <!-- Chat Messages -->
+                <div id="chat-messages" class="space-y-4 mb-4 max-h-96 overflow-y-auto">
+                    <div class="bg-indigo-50 p-3 rounded-lg">
+                        <p class="text-gray-700">Hello! You can ask questions about the analyzed text. For example:</p>
+                        <ul class="list-disc list-inside text-sm text-gray-600 mt-2">
+                            <li>What are the main topics discussed?</li>
+                            <li>Can you explain the sentiment in more detail?</li>
+                            <li>What makes this text positive/negative?</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Chat Input -->
+                <div class="flex items-center space-x-3">
+                    <input
+                        type="text"
+                        id="chat-input"
+                        class="flex-1 rounded-lg border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Type your question here..."
+                    >
+                    <button
+                        id="send-message"
+                        class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled
+                    >
+                        Send
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropZone = document.getElementById('drop-zone');
+            const fileUpload = document.getElementById('file-upload');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            let sentimentChart = null;
+            let topicsChart = null;
+            let wordFrequencyChart = null;
+            let sentimentMetricsChart = null;
+
+            // Handle drag and drop
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, highlight, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, unhighlight, false);
+            });
+
+            function highlight(e) {
+                dropZone.classList.add('bg-indigo-50');
+            }
+
+            function unhighlight(e) {
+                dropZone.classList.remove('bg-indigo-50');
+            }
+
+            dropZone.addEventListener('drop', handleDrop, false);
+            fileUpload.addEventListener('change', handleFileSelect, false);
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const file = dt.files[0];
+                handleFile(file);
+            }
+
+            function handleFileSelect(e) {
+                const file = e.target.files[0];
+                handleFile(file);
+            }
+
+            function handleFile(file) {
+                if (file && file.type.startsWith('image/')) {
+                    // Show loading state
+                    loading.classList.add('active');
+                    results.classList.add('hidden');
+
+                    // Preview image
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        document.getElementById('image-preview').src = e.target.result;
+                    }
+                    reader.readAsDataURL(file);
+
+                    // Upload file
+                    const formData = new FormData();
+                    formData.append('image', file);
+
+                    fetch('http://localhost:3000/upload', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            displayResults(data.data);
+                        } else {
+                            throw new Error(data.message);
+                        }
+                    })
+                    .catch(error => {
+                        alert('Error: ' + error.message);
+                    })
+                    .finally(() => {
+                        loading.classList.remove('active');
+                        results.classList.remove('hidden');
+                    });
+                }
+            }
+
+            function createSentimentChart(sentiment) {
+                if (sentimentChart) {
+                    sentimentChart.destroy();
+                }
+
+                const ctx = document.getElementById('sentimentChart').getContext('2d');
+                const sentimentScore = {
+                    'positive': 1,
+                    'neutral': 0,
+                    'negative': -1
+                }[sentiment.toLowerCase()];
+
+                const backgroundColor = sentimentScore === 1 ? '#10B981' : 
+                                      sentimentScore === 0 ? '#6B7280' : '#EF4444';
+
+                sentimentChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Sentiment'],
+                        datasets: [{
+                            label: 'Sentiment Score',
+                            data: [sentimentScore],
+                            backgroundColor: backgroundColor,
+                            borderColor: backgroundColor,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                min: -1,
+                                max: 1,
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: `Sentiment: ${sentiment}`
+                            },
+                            legend: {
+                                display: false
+                            }
+                        }
+                    }
+                });
+            }
+
+            function createTopicsChart(topics) {
+                if (topicsChart) {
+                    topicsChart.destroy();
+                }
+
+                const ctx = document.getElementById('topicsChart').getContext('2d');
+                const colors = [
+                    '#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+                    '#EC4899', '#06B6D4', '#84CC16', '#F97316', '#6366F1'
+                ];
+
+                topicsChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: topics,
+                        datasets: [{
+                            data: topics.map(() => 1), // Equal weight for each topic
+                            backgroundColor: colors.slice(0, topics.length),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Topic Distribution'
+                            }
+                        }
+                    }
+                });
+            }
+
+            function getWordFrequency(text) {
+                const words = text.toLowerCase().match(/\b\w+\b/g) || [];
+                const frequency = {};
+                words.forEach(word => {
+                    if (word.length > 3) { // Only count words longer than 3 characters
+                        frequency[word] = (frequency[word] || 0) + 1;
+                    }
+                });
+                
+                // Sort by frequency and get top 10
+                return Object.entries(frequency)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 10);
+            }
+
+            function createWordFrequencyChart(text) {
+                if (wordFrequencyChart) {
+                    wordFrequencyChart.destroy();
+                }
+
+                const wordFrequency = getWordFrequency(text);
+                const ctx = document.getElementById('wordFrequencyChart').getContext('2d');
+
+                wordFrequencyChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: wordFrequency.map(([word]) => word),
+                        datasets: [{
+                            label: 'Word Frequency',
+                            data: wordFrequency.map(([, count]) => count),
+                            backgroundColor: '#4F46E5',
+                            borderColor: '#4338CA',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        indexAxis: 'y',
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            title: {
+                                display: true,
+                                text: 'Most Frequent Words'
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Frequency'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function calculateSentimentMetrics(text, sentiment) {
+                // Simple metrics based on text characteristics
+                const words = text.split(/\s+/);
+                const sentences = text.split(/[.!?]+/).filter(Boolean);
+                const avgWordsPerSentence = words.length / sentences.length;
+                
+                // Sentiment score conversion
+                const sentimentScore = {
+                    'positive': 0.8,
+                    'neutral': 0.5,
+                    'negative': 0.2
+                }[sentiment.toLowerCase()] || 0.5;
+
+                return {
+                    clarity: Math.min(1, avgWordsPerSentence / 20), // Normalize to 0-1
+                    confidence: sentimentScore,
+                    complexity: Math.min(1, words.filter(w => w.length > 6).length / words.length * 3),
+                    intensity: Math.min(1, text.split(/[!?]/).length / sentences.length)
+                };
+            }
+
+            function createSentimentMetricsChart(text, sentiment) {
+                if (sentimentMetricsChart) {
+                    sentimentMetricsChart.destroy();
+                }
+
+                const metrics = calculateSentimentMetrics(text, sentiment);
+                const ctx = document.getElementById('sentimentMetricsChart').getContext('2d');
+
+                sentimentMetricsChart = new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['Clarity', 'Confidence', 'Complexity', 'Intensity'],
+                        datasets: [{
+                            label: 'Text Metrics',
+                            data: [
+                                metrics.clarity,
+                                metrics.confidence,
+                                metrics.complexity,
+                                metrics.intensity
+                            ],
+                            backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                            borderColor: '#4F46E5',
+                            pointBackgroundColor: '#4F46E5',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: '#4F46E5'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                beginAtZero: true,
+                                max: 1,
+                                ticks: {
+                                    stepSize: 0.2
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Text Analysis Metrics'
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Chat Interface Variables
+            const chatInterface = document.getElementById('chat-interface');
+            const chatMessages = document.getElementById('chat-messages');
+            const chatInput = document.getElementById('chat-input');
+            const sendButton = document.getElementById('send-message');
+            let analysisData = null;
+
+            // Enable chat interface when analysis is complete
+            function enableChat() {
+                chatInterface.classList.remove('hidden');
+                sendButton.disabled = false;
+            }
+
+            // Update the addMessage function to handle structured responses
+            function addMessage(content, isUser = false) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `p-3 rounded-lg ${isUser ? 'bg-indigo-100 ml-12' : 'bg-gray-100 mr-12'} mb-4`;
+
+                if (isUser) {
+                    // User message
+                    const messageContent = document.createElement('p');
+                    messageContent.className = 'text-gray-700';
+                    messageContent.textContent = content;
+                    messageDiv.appendChild(messageContent);
+                } else {
+                    // AI response - handle different formats gracefully
+                    console.log('AI response:', content);
+                    
+                    try {
+                        // If content is a string, show it directly
+                        if (typeof content === 'string') {
+                            const answer = document.createElement('p');
+                            answer.className = 'text-gray-700 mb-2';
+                            answer.textContent = content;
+                            messageDiv.appendChild(answer);
+                            
+                        // If content is an object with expected structure
+                        } else if (content && typeof content === 'object') {
+                            const answer = document.createElement('p');
+                            answer.className = 'text-gray-700 mb-2';
+                            answer.textContent = content.answer || JSON.stringify(content);
+                            messageDiv.appendChild(answer);
+
+                            // Evidence section
+                            if (content.evidence && Array.isArray(content.evidence) && content.evidence.length > 0) {
+                                const evidenceDiv = document.createElement('div');
+                                evidenceDiv.className = 'mt-2 text-sm';
+                                
+                                const evidenceTitle = document.createElement('p');
+                                evidenceTitle.className = 'text-gray-600 font-medium';
+                                evidenceTitle.textContent = 'Evidence:';
+                                evidenceDiv.appendChild(evidenceTitle);
+
+                                const evidenceList = document.createElement('ul');
+                                evidenceList.className = 'list-disc list-inside text-gray-600 ml-2';
+                                content.evidence.forEach(item => {
+                                    const li = document.createElement('li');
+                                    li.textContent = item;
+                                    evidenceList.appendChild(li);
+                                });
+                                evidenceDiv.appendChild(evidenceList);
+                                messageDiv.appendChild(evidenceDiv);
+                            }
+
+                            // Confidence indicator
+                            if (content.confidence) {
+                                const confidenceSpan = document.createElement('span');
+                                confidenceSpan.className = `inline-flex items-center px-2 py-1 mt-2 rounded-full text-xs font-medium ${
+                                    content.confidence === 'High' ? 'bg-green-100 text-green-800' :
+                                    content.confidence === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                                    'bg-red-100 text-red-800'
+                                }`;
+                                confidenceSpan.textContent = `Confidence: ${content.confidence}`;
+                                messageDiv.appendChild(confidenceSpan);
+                            }
+
+                            // Related topics
+                            if (content.relatedTopics && Array.isArray(content.relatedTopics) && content.relatedTopics.length > 0) {
+                                const topicsDiv = document.createElement('div');
+                                topicsDiv.className = 'mt-2 flex flex-wrap gap-1';
+                                content.relatedTopics.forEach(topic => {
+                                    const topicSpan = document.createElement('span');
+                                    topicSpan.className = 'px-2 py-1 rounded-full bg-indigo-100 text-indigo-800 text-xs';
+                                    topicSpan.textContent = topic;
+                                    topicsDiv.appendChild(topicSpan);
+                                });
+                                messageDiv.appendChild(topicsDiv);
+                            }
+
+                            // Suggestions for follow-up questions
+                            if (content.suggestions && Array.isArray(content.suggestions) && content.suggestions.length > 0) {
+                                const suggestionsDiv = document.createElement('div');
+                                suggestionsDiv.className = 'mt-3 text-sm';
+                                
+                                const suggestionsTitle = document.createElement('p');
+                                suggestionsTitle.className = 'text-gray-600 font-medium';
+                                suggestionsTitle.textContent = 'Suggested follow-up questions:';
+                                suggestionsDiv.appendChild(suggestionsTitle);
+
+                                const suggestionsList = document.createElement('ul');
+                                suggestionsList.className = 'mt-1 space-y-1';
+                                content.suggestions.forEach(suggestion => {
+                                    const li = document.createElement('li');
+                                    const button = document.createElement('button');
+                                    button.className = 'text-indigo-600 hover:text-indigo-800 hover:underline text-left w-full';
+                                    button.textContent = suggestion;
+                                    button.onclick = () => {
+                                        chatInput.value = suggestion;
+                                        chatInput.focus();
+                                    };
+                                    li.appendChild(button);
+                                    suggestionsList.appendChild(li);
+                                });
+                                suggestionsDiv.appendChild(suggestionsList);
+                                messageDiv.appendChild(suggestionsDiv);
+                            }
+                        } else {
+                            // Fallback for unknown content format
+                            const errorMsg = document.createElement('p');
+                            errorMsg.className = 'text-red-600';
+                            errorMsg.textContent = 'Error: Received invalid response format';
+                            messageDiv.appendChild(errorMsg);
+                            
+                            const rawContent = document.createElement('pre');
+                            rawContent.className = 'text-xs mt-2 p-2 bg-gray-200 overflow-auto max-h-40';
+                            rawContent.textContent = JSON.stringify(content, null, 2);
+                            messageDiv.appendChild(rawContent);
+                        }
+                    } catch (error) {
+                        console.error('Error displaying message:', error);
+                        const errorMsg = document.createElement('p');
+                        errorMsg.className = 'text-red-600';
+                        errorMsg.textContent = `Error displaying message: ${error.message}`;
+                        messageDiv.appendChild(errorMsg);
+                    }
+                }
+
+                chatMessages.appendChild(messageDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            // Update the handleSendMessage function to use the /ask endpoint
+            async function handleSendMessage() {
+                const message = chatInput.value.trim();
+                if (!message) return;
+
+                // Add user message
+                addMessage(message, true);
+                chatInput.value = '';
+
+                // Show loading state
+                setLoadingState(true);
+
+                try {
+                    // Ensure analysisData exists and has the required structure
+                    if (!analysisData || !analysisData.textExtraction || !analysisData.analysis) {
+                        console.error('Invalid analysis data:', analysisData);
+                        throw new Error('Analysis data is incomplete or missing');
+                    }
+
+                    // Send message to backend for analysis
+                    const response = await fetch('http://localhost:3000/ask', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            question: message,
+                            analysisContext: analysisData
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.status === 'success') {
+                        // Add AI response with structured data
+                        addMessage(data.analysis);
+                    } else {
+                        console.error('Server error:', data);
+                        throw new Error(data.message || 'Unknown error occurred');
+                    }
+                } catch (error) {
+                    console.error('Chat error:', error);
+                    
+                    addMessage({
+                        answer: `Sorry, I encountered an error processing your question: ${error.message}. Please try again.`,
+                        confidence: 'Low',
+                        evidence: [],
+                        relatedTopics: [],
+                        suggestions: ['Try rephrasing your question', 'Make sure your question is related to the analyzed text']
+                    });
+                } finally {
+                    setLoadingState(false);
+                }
+            }
+
+            // Event listeners for chat interface
+            sendButton.addEventListener('click', handleSendMessage);
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleSendMessage();
+                }
+            });
+
+            // Update the existing displayResults function
+            function displayResults(data) {
+                // Store analysis data for chat context
+                analysisData = data;
+                
+                // Display extracted text
+                document.getElementById('extracted-text').textContent = data.textExtraction.raw;
+                document.getElementById('word-count').textContent = data.textExtraction.wordCount;
+                document.getElementById('char-count').textContent = data.textExtraction.characterCount;
+
+                // Display analysis
+                document.getElementById('summary').textContent = data.analysis.summary;
+                
+                // Display key points
+                const keyPointsList = document.getElementById('key-points');
+                keyPointsList.innerHTML = '';
+                data.analysis.keyPoints.forEach(point => {
+                    const li = document.createElement('li');
+                    li.textContent = point;
+                    keyPointsList.appendChild(li);
+                });
+
+                // Display sentiment and language
+                document.getElementById('sentiment').textContent = data.analysis.sentiment;
+                document.getElementById('language').textContent = data.analysis.language;
+
+                // Display topics
+                const topicsContainer = document.getElementById('topics');
+                topicsContainer.innerHTML = '';
+                data.analysis.topics.forEach(topic => {
+                    const span = document.createElement('span');
+                    span.className = 'px-2 py-1 rounded-full bg-indigo-100 text-indigo-800 text-sm';
+                    span.textContent = topic;
+                    topicsContainer.appendChild(span);
+                });
+
+                // Create visualizations
+                createSentimentChart(data.analysis.sentiment);
+                createTopicsChart(data.analysis.topics);
+                createWordFrequencyChart(data.textExtraction.raw);
+                createSentimentMetricsChart(data.textExtraction.raw, data.analysis.sentiment);
+
+                // Show results
+                results.classList.remove('hidden');
+
+                // Enable chat interface after analysis
+                enableChat();
+            }
+
+            // Add loading state for chat
+            function setLoadingState(isLoading) {
+                sendButton.disabled = isLoading;
+                chatInput.disabled = isLoading;
+                if (isLoading) {
+                    sendButton.textContent = 'Sending...';
+                } else {
+                    sendButton.textContent = 'Send';
+                }
+            }
+        });
+    </script>
+</body>
+</html> 
